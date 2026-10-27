@@ -1,9 +1,39 @@
 import api from './api'
-import type { AuthResponse, UserProfile, ResetPasswordPayload, PasswordResetResponse } from '@/types/api'
+import type { AuthResponse, UserProfile, ResetPasswordPayload, PasswordResetResponse, MfaSetupResponse } from '@/types/api'
 
 export const authService = {
-  async login(email: string, password: string) {
-    const { data } = await api.post<AuthResponse>('/login', { email, password })
+  async login(email: string, password: string, keepLoggedIn = false) {
+    const { data } = await api.post<AuthResponse>('/login', {
+      email,
+      password,
+      keep_logged_in: keepLoggedIn,
+      remember: keepLoggedIn,
+    })
+    return data
+  },
+
+  async verifyMfa(mfa_token: string, code: string) {
+    const { data } = await api.post<AuthResponse>('/mfa/verify', { mfa_token, code })
+    return data
+  },
+
+  async setupMfa() {
+    const { data } = await api.post<MfaSetupResponse>('/mfa/setup')
+    return data
+  },
+
+  async confirmMfa(code: string) {
+    const { data } = await api.post<{ status: string; message: string }>('/mfa/confirm', { code })
+    return data
+  },
+
+  async disableMfa(password: string) {
+    const { data } = await api.post<{ status: string; message: string }>('/mfa/disable', { password })
+    return data
+  },
+
+  async regenerateRecoveryCodes(password: string) {
+    const { data } = await api.post<{ status: string; message: string; recovery_codes: string[] }>('/mfa/recovery-codes', { password })
     return data
   },
 
@@ -12,8 +42,8 @@ export const authService = {
     return data.user
   },
 
-  async logout() {
-    await api.post('/logout')
+  async logout(allDevices = false) {
+    await api.post('/logout', { all_devices: allDevices })
   },
 
   async forgotPassword(email: string): Promise<PasswordResetResponse> {

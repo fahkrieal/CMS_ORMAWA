@@ -103,6 +103,14 @@ class Organization extends Model
         return $this->hasMany(OrganizationPeriod::class);
     }
 
+    /**
+     * Relasi ke semua Anggota dalam organisasi ini
+     */
+    public function members(): HasMany
+    {
+        return $this->hasMany(Member::class);
+    }
+
     public function committees(): HasMany
     {
         return $this->hasMany(Committee::class);
@@ -129,14 +137,30 @@ class Organization extends Model
     }
 
     /**
-     * Mendapatkan period aktif saat ini (jika ada)
+     * Mendapatkan period aktif saat ini berbasis tanggal berjalan
      */
     public function currentPeriod()
     {
+        $tz = config('app.timezone', 'Asia/Jakarta');
+        $today = now($tz)->toDateString();
+
+        // 1. Cari periode aktif/berjalan yang rentang tanggalnya melingkupi hari ini
+        $ongoing = $this->periods()
+            ->where('status', '!=', 'rejected')
+            ->where('status', '!=', 'pending')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->latest('start_date')
+            ->first();
+
+        if ($ongoing) {
+            return $ongoing;
+        }
+
+        // 2. Fallback jika ada periode yang status DB-nya active (kompatibilitas data lama)
         return $this->periods()
             ->where('status', 'active')
-            ->whereDate('start_date', '<=', now()->toDateString())
-            ->whereDate('end_date', '>=', now()->toDateString())
+            ->latest('end_date')
             ->first();
     }
 

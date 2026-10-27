@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ActivityController;
 use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\AnnouncementController;
+use App\Http\Controllers\Api\MemberController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\TagController;
 use App\Http\Controllers\CommitteeController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Api\PublicController;
 
 // Public Routes (Accessible without Authentication)
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:6,1');
+Route::post('/mfa/verify', [AuthController::class, 'verifyMfa'])->middleware('throttle:5,1');
 Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
 Route::post('/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:5,1');
 Route::post('/register/organization', [\App\Http\Controllers\Api\OrganizationRegistrationController::class, 'store'])->middleware('throttle:10,1');
@@ -50,8 +52,14 @@ Route::prefix('public')->group(function () {
     Route::get('/profile', [AuthController::class, 'me']);
     Route::patch('/profile', [AuthController::class, 'updateProfile']);
     Route::post('/profile', [AuthController::class, 'updateProfile']);
-    Route::put('/password', [AuthController::class, 'updatePassword']);
-    Route::patch('/password', [AuthController::class, 'updatePassword']);
+    Route::put('/password', [AuthController::class, 'updatePassword'])->middleware('throttle:6,1');
+    Route::patch('/password', [AuthController::class, 'updatePassword'])->middleware('throttle:6,1');
+
+    // MFA Management
+    Route::post('/mfa/setup', [AuthController::class, 'setupMfa']);
+    Route::post('/mfa/confirm', [AuthController::class, 'confirmMfa'])->middleware('throttle:5,1');
+    Route::post('/mfa/disable', [AuthController::class, 'disableMfa'])->middleware('throttle:5,1');
+    Route::post('/mfa/recovery-codes', [AuthController::class, 'regenerateRecoveryCodes'])->middleware('throttle:5,1');
 
     // API Media Library Management
     Route::get('/media', [MediaController::class, 'index']);
@@ -147,9 +155,16 @@ Route::prefix('public')->group(function () {
     Route::get('/tags', [TagController::class, 'index'])->name('api.tags.index');
     Route::post('/tags', [TagController::class, 'store'])->name('api.tags.store');
 
+    // Members / Manajemen Anggota
+    Route::get('/members/template', [MemberController::class, 'template'])->name('api.members.template');
+    Route::get('/members/export', [MemberController::class, 'export'])->name('api.members.export');
+    Route::post('/members/import', [MemberController::class, 'import'])->name('api.members.import');
+    Route::apiResource('/members', MemberController::class)->names('api.members');
+
     // Committees / Pengurus
     Route::get('/organization-users/linkable', [CommitteeController::class, 'linkableUsers'])->name('api.organization_users.linkable');
     Route::get('/committees/linkable-users', [CommitteeController::class, 'linkableUsers'])->name('api.committees.linkable_users');
+    Route::get('/committees/linkable-members', [CommitteeController::class, 'linkableMembers'])->name('api.committees.linkable_members');
     Route::get('/committees', [CommitteeController::class, 'index'])->name('api.committees.index');
     Route::get('/committees/{id}', [CommitteeController::class, 'show'])->name('api.committees.show');
     Route::post('/committees', [CommitteeController::class, 'store'])->name('api.committees.store');

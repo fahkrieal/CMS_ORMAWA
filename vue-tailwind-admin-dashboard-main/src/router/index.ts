@@ -373,6 +373,12 @@ const router = createRouter({
       meta: { requiresAuth: true, roles: ['Admin Organisasi'], permission: 'organizations.manage', title: 'Settings' },
     },
     {
+      path: '/organization/members',
+      name: 'organization-members',
+      component: () => import('@/views/organization/members/Index.vue'),
+      meta: { requiresAuth: true, roles: ['Admin Organisasi', 'Editor', 'Kontributor'], permission: 'structure.view', title: 'Manajemen Anggota & Kepengurusan' },
+    },
+    {
       path: '/organization/period',
       name: 'organization-period',
       component: () => import('@/views/organization/period/List.vue'),

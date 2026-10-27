@@ -1027,28 +1027,75 @@ class PublicController extends Controller
 
     /**
      * 11. GET /api/public/organizations/{slug}/structure
-     * Public organizational structure (Committees for active period)
+     * Public organizational structure (Committees for ongoing active period or selected historical archive)
      */
-    public function structure(string $slug)
+    public function structure(Request $request, string $slug)
     {
         $org = $this->resolveOrganization($slug);
         $this->ensureModuleEnabled($org, 'structure');
 
-        $committees = Committee::withoutGlobalScopes()
-            ->where('organization_id', $org->id)
-            ->where('status', 'active')
+        // Ambil semua periode organisasi untuk pilihan dropdown arsip publik
+        $availablePeriods = $org->periods()
+            ->orderBy('start_date', 'desc')
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'id'                => $p->id,
+                    'period_name'       => $p->period_name,
+                    'start_date'        => $p->start_date?->format('Y-m-d'),
+                    'end_date'          => $p->end_date?->format('Y-m-d'),
+                    'status'            => $p->status,
+                    'calculated_status' => $p->calculated_status,
+                    'is_ongoing'        => $p->isOngoing(),
+                ];
+            });
+
+        $currentOngoingPeriod = $org->currentPeriod();
+        $selectedPeriod = null;
+
+        if ($request->filled('period_id')) {
+            $selectedPeriod = $org->periods()->where('id', $request->period_id)->first();
+            if (!$selectedPeriod) {
+                abort(404, 'Periode kepengurusan yang diminta tidak ditemukan.');
+            }
+        } else {
+            $selectedPeriod = $currentOngoingPeriod;
+        }
+
+        $committeeQuery = Committee::withoutGlobalScopes()
+            ->where('organization_id', $org->id);
+
+        if ($selectedPeriod) {
+            $committeeQuery->where('organization_period_id', $selectedPeriod->id);
+            // Jika melihat periode yang sedang berjalan (ongoing), hanya tampilkan yang statusnya aktif secara efektif
+            if ($selectedPeriod->isOngoing()) {
+                $committeeQuery->effectiveActive();
+            } else {
+                // Untuk arsip periode lampau/mendatang, tampilkan yang tercatat aktif pada periode tersebut
+                $committeeQuery->where('status', 'active');
+            }
+        } else {
+            // Jika organisasi belum memiliki periode aktif saat ini dan tidak ada periode yang dipilih,
+            // jangan tampilkan pengurus dari periode kedaluwarsa secara membabi-buta!
+            $committeeQuery->whereRaw('1 = 0');
+        }
+
+        $committees = $committeeQuery
             ->orderBy('department', 'asc')
             ->orderBy('position', 'asc')
             ->get()
             ->map(function ($c) {
                 return [
-                    'id' => $c->id,
-                    'name' => $c->name,
-                    'position' => $c->position,
-                    'department' => $c->department ?? 'Pengurus Inti',
-                    'period' => $c->period,
-                    'photo' => $c->photo_url,
-                    'photo_url' => $c->photo_url,
+                    'id'                  => $c->id,
+                    'name'                => $c->name,
+                    'position'            => $c->position,
+                    'department'          => $c->department ?? 'Pengurus Inti',
+                    'period'              => $c->period,
+                    'start_date'          => $c->start_date?->format('Y-m-d'),
+                    'end_date'            => $c->end_date?->format('Y-m-d'),
+                    'photo'               => $c->photo_url,
+                    'photo_url'           => $c->photo_url,
+                    'is_active_effective' => $c->is_active_effective,
                 ];
             });
 
@@ -1059,13 +1106,23 @@ class PublicController extends Controller
             'status' => 'success',
             'data' => [
                 'organization' => [
-                    'nama' => $org->nama,
-                    'subdomain' => $org->subdomain,
-                    'logo' => $org->logo,
-                    'current_period' => $org->currentPeriod()?->period_name,
+                    'nama'           => $org->nama,
+                    'subdomain'      => $org->subdomain,
+                    'logo'           => $org->logo,
+                    'current_period' => $currentOngoingPeriod?->period_name,
                 ],
-                'members' => $committees,
-                'by_department' => $grouped,
+                'selected_period'   => $selectedPeriod ? [
+                    'id'                => $selectedPeriod->id,
+                    'period_name'       => $selectedPeriod->period_name,
+                    'start_date'        => $selectedPeriod->start_date?->format('Y-m-d'),
+                    'end_date'          => $selectedPeriod->end_date?->format('Y-m-d'),
+                    'status'            => $selectedPeriod->status,
+                    'calculated_status' => $selectedPeriod->calculated_status,
+                    'is_ongoing'        => $selectedPeriod->isOngoing(),
+                ] : null,
+                'available_periods' => $availablePeriods,
+                'members'           => $committees,
+                'by_department'     => $grouped,
             ]
         ]);
     }

@@ -4,8 +4,11 @@ import type { ApiListResponse, ApiSingleResponse, Committee } from '@/types/api'
 export interface CommitteeFilterParams {
   period?: string
   organization_period_id?: number
+  member_id?: number
   status?: string
   search?: string
+  effective_active?: boolean
+  organization_id?: number
 }
 
 export interface LinkableUser {
@@ -17,6 +20,22 @@ export interface LinkableUser {
   status: string
   is_already_linked?: boolean
   is_linked?: boolean
+}
+
+export interface LinkableMember {
+  id: number
+  nama: string
+  nim: string
+  jurusan?: string
+  angkatan?: string
+  status: string
+  user_id?: number | null
+  user?: {
+    id: number
+    name: string
+    email: string
+  } | null
+  is_already_assigned?: boolean
 }
 
 export const committeeService = {
@@ -32,6 +51,11 @@ export const committeeService = {
 
   async getLinkableUsers(params?: { organization_id?: number; organization_period_id?: number; current_committee_id?: number }) {
     const { data } = await api.get<ApiListResponse<LinkableUser>>('/organization-users/linkable', { params })
+    return data.data
+  },
+
+  async getLinkableMembers(params?: { organization_id?: number; organization_period_id?: number; current_committee_id?: number }) {
+    const { data } = await api.get<ApiListResponse<LinkableMember>>('/committees/linkable-members', { params })
     return data.data
   },
 

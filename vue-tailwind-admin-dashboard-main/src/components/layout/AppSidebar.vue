@@ -319,7 +319,17 @@ const menuGroups = computed<MenuGroup[]>(() => {
   // Organization Management Group
   const orgItems: MenuItem[] = []
   if (authStore.hasPermission('structure.view')) {
-    orgItems.push({ icon: UsersIcon, name: 'Struktur Organisasi', path: '/organization/committees' })
+    orgItems.push({
+      icon: UsersIcon,
+      name: 'Manajemen Anggota & Kepengurusan',
+      subItems: [
+        { name: 'Anggota', path: '/organization/members?tab=members' },
+        { name: 'Periode Kepengurusan', path: '/organization/members?tab=periods' },
+        { name: 'Struktur Organisasi', path: '/organization/members?tab=structure' },
+        { name: 'Riwayat Kepengurusan', path: '/organization/members?tab=history' },
+        { name: 'Import/Export Anggota', path: '/organization/members?tab=import-export' },
+      ]
+    })
   }
   if (authStore.hasPermission('periods.manage')) {
     orgItems.push({ icon: CalendarClockIcon, name: 'Manajemen Periode', path: '/organization/period' })
@@ -354,12 +364,14 @@ const menuGroups = computed<MenuGroup[]>(() => {
 const isActive = (path?: string) => {
   if (!path) return false;
   const currentPath = route.path;
+  const currentFullPath = route.fullPath;
 
-  // Exact match
-  if (currentPath === path) return true;
+  // Exact match with full path (including query) or route path
+  if (currentFullPath === path || currentPath === path) return true;
 
-  // Subroute / child path match (e.g. /organization/gallery/123 or /organization/posts/create)
-  if (path !== '/' && currentPath.startsWith(path + '/')) return true;
+  // Subroute / child path match
+  const basePath = path.split('?')[0];
+  if (basePath !== '/' && currentPath.startsWith(basePath + '/') && !path.includes('?')) return true;
 
   return false;
 };

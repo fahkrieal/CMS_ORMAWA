@@ -101,6 +101,10 @@ class ActivityController extends Controller
             abort(403, 'Unauthorized. Anda tidak memiliki izin untuk melihat agenda kegiatan.');
         }
 
+        if (!$user->hasRole('Super Admin') && (int)$activity->organization_id !== (int)$user->organization_id) {
+            abort(403, 'Unauthorized. Anda tidak dapat melihat agenda organisasi lain.');
+        }
+
         return response()->json([
             'status' => 'success',
             'data'   => $activity->load(['user:id,name', 'organization:id,nama'])

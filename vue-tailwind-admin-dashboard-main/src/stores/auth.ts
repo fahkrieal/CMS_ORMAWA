@@ -101,23 +101,38 @@ export const useAuthStore = defineStore('auth', () => {
     return restorePromise
   }
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, keepLoggedIn = false) => {
     isLoading.value = true
     error.value = null
 
     try {
-      const response = await authService.login(email, password)
-      persistAuth(response.access_token, response.user)
-      isLoading.value = false
-      isInitialized.value = true
+      const response = await authService.login(email, password, keepLoggedIn)
 
-      if (role.value === 'Super Admin') {
-        await router.push('/dashboard')
-      } else {
-        await router.push('/organization/dashboard')
+      if (response.mfa_required) {
+        isLoading.value = false
+        return {
+          mfaRequired: true,
+          mfaToken: response.mfa_token,
+          message: response.message,
+        }
       }
 
-      return true
+      if (response.access_token && response.user) {
+        persistAuth(response.access_token, response.user)
+        isLoading.value = false
+        isInitialized.value = true
+
+        if (role.value === 'Super Admin') {
+          await router.push('/dashboard')
+        } else {
+          await router.push('/organization/dashboard')
+        }
+
+        return { success: true }
+      }
+
+      isLoading.value = false
+      return { success: false }
     } catch (err: any) {
       isLoading.value = false
       let msg = 'Gagal melakukan login. Silakan coba lagi.'
@@ -125,7 +140,7 @@ export const useAuthStore = defineStore('auth', () => {
         if (err.status === 401 || err.status === 422) {
           msg = 'Email atau kata sandi yang Anda masukkan salah.'
         } else if (err.status === 403) {
-          msg = 'Akun Anda tidak memiliki akses ke sistem.'
+          msg = err.message || 'Akun Anda tidak memiliki akses ke sistem.'
         } else if (err.status === 500) {
           msg = 'Terjadi kesalahan pada server. Silakan coba lagi nanti.'
         } else if (err.status === undefined && err.message) {
@@ -135,13 +150,47 @@ export const useAuthStore = defineStore('auth', () => {
         msg = err.message
       }
       error.value = msg
+      return { success: false, error: msg }
+    }
+  }
+
+  const verifyMfa = async (mfaToken: string, code: string) => {
+    isLoading.value = true
+    error.value = null
+
+    try {
+      const response = await authService.verifyMfa(mfaToken, code)
+      if (response.access_token && response.user) {
+        persistAuth(response.access_token, response.user)
+        isLoading.value = false
+        isInitialized.value = true
+
+        if (role.value === 'Super Admin') {
+          await router.push('/dashboard')
+        } else {
+          await router.push('/organization/dashboard')
+        }
+
+        return true
+      }
+      isLoading.value = false
+      return false
+    } catch (err: any) {
+      isLoading.value = false
+      let msg = 'Kode verifikasi dua faktor tidak valid.'
+      if (err?.data?.errors?.code?.[0]) {
+        msg = err.data.errors.code[0]
+      } else if (err?.message) {
+        msg = err.message
+      }
+      error.value = msg
       return false
     }
   }
 
-  const logout = async () => {
+  const logout = async (allDevices = false) => {
     try {
-      await authService.logout()
+      await authService.logout(allDevices)
     } catch {
       // Ignore API errors during logout
     }
@@ -182,6 +231,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading,
     error,
     login,
+    verifyMfa,
     logout,
     restoreSession,
     clearAuth,

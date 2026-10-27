@@ -246,6 +246,10 @@ class UserController extends Controller
 
         if (!empty($userData)) {
             $targetUser->update($userData);
+
+            if ((isset($userData['status']) && $userData['status'] === 'inactive') || isset($userData['password'])) {
+                $targetUser->tokens()->delete();
+            }
         }
 
         // 4. Role Synchronization:
@@ -386,6 +390,9 @@ class UserController extends Controller
 
         $targetUser->update(['status' => 'inactive']);
 
+        // Revoke all tokens for the deactivated user
+        $targetUser->tokens()->delete();
+
         ActivityLogService::log('deactivate', 'users', 'Menonaktifkan akun pengguna: ' . $targetUser->name, $targetUser, [
             'target_user_id' => $targetUser->id,
             'target_email' => $targetUser->email,
@@ -437,6 +444,9 @@ class UserController extends Controller
         $targetUser->update([
             'password' => Hash::make($request->password),
         ]);
+
+        // Revoke all tokens so old sessions cannot persist after admin password reset
+        $targetUser->tokens()->delete();
 
         ActivityLogService::log('reset_password', 'users', 'Mereset password pengguna: ' . $targetUser->name, $targetUser, [
             'target_user_id' => $targetUser->id,

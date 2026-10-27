@@ -157,12 +157,14 @@ export const publicService = {
   },
 
   // GET /api/public/organizations/{slug}/structure
-  async getStructure(slug: string): Promise<{
+  async getStructure(slug: string, params?: { period_id?: number }): Promise<{
     organization: { nama: string; subdomain: string; logo?: string; current_period?: string }
+    selected_period?: { id: number; period_name: string; start_date?: string; end_date?: string; calculated_status?: string; is_ongoing?: boolean } | null
+    available_periods?: Array<{ id: number; period_name: string; start_date?: string; end_date?: string; calculated_status?: string; is_ongoing?: boolean }>
     members: PublicCommittee[]
     by_department: Record<string, PublicCommittee[]>
   }> {
-    const res = await apiClient.get(`/public/organizations/${slug}/structure`)
+    const res = await apiClient.get(`/public/organizations/${slug}/structure`, { params })
     return res.data.data
   },
 }

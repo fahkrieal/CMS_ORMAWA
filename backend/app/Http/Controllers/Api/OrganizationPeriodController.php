@@ -170,8 +170,9 @@ class OrganizationPeriodController extends Controller
     {
         $period = OrganizationPeriod::with(['organization', 'reviewer'])->findOrFail($id);
 
-        if (!auth()->user()->hasRole('Super Admin')) {
-            abort(403, 'Hanya Super Admin yang diizinkan mengedit periode.');
+        $user = auth()->user();
+        if (!$user || !$user->hasRole('Super Admin')) {
+            abort(403, 'Unauthorized. Super Admin only.');
         }
 
         $validated = $request->validate([
